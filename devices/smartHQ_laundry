@@ -18,6 +18,8 @@ limitations under the License.
 
 Change history:
 
+0.9.7 - cfontaine - Added water level, dryer temperature, cycle end time for combo units
+0.9.6 - cfontaine - Added Combination Washer Dryer support (dryer time, sub cycle, remote status)
 0.9.5 - tomw - Improved Washer/Dryer support (in SmartHQ Laundry driver)
 0.9.2 - tomw - Make child logging follow system device setting
 0.9.0 - tomw - Initial release
@@ -38,6 +40,15 @@ metadata
         attribute "machineState", "string"
         attribute "smartDispenseTankStatus", "string"
         attribute "timeRemaining", "number"
+        
+        // Combination Washer Dryer attributes
+        attribute "subCycle", "string"
+        attribute "remoteStatus", "enum", ["disabled", "enabled"]
+        attribute "dryerTimeRemaining", "number"
+        attribute "dryerDelayRemaining", "number"
+        attribute "waterLevel", "number"
+        attribute "dryerTemperature", "string"
+        attribute "cycleEndTime", "number"
     }
 }
 
@@ -84,6 +95,37 @@ def parse(item)
         case LAUNDRY_WASHER_SMART_DISPENSE_TANK_STATUS:
             parseSmartDispenseTankStatus(item.value)
             break
+        
+        // Combination Washer Dryer support
+        case LAUNDRY_SUB_CYCLE:
+            parseSubCycle(item.value)
+            break
+        
+        case LAUNDRY_REMOTE_STATUS:
+            parseRemoteStatus(item.value)
+            break
+        
+        case COMBO_DRYER_TIME_REMAINING:
+            def dryerTimeRemMins = (decodeErdInt(hubitat.helper.HexUtils.hexStringToByteArray(item.value)) / 60).toInteger()
+            sendEvent(name: "dryerTimeRemaining", value: dryerTimeRemMins)
+            break
+        
+        case COMBO_DRYER_DELAY_TIME_REMAINING:
+            def dryerDelayRemMins = (decodeErdInt(hubitat.helper.HexUtils.hexStringToByteArray(item.value)) / 60).toInteger()
+            sendEvent(name: "dryerDelayRemaining", value: dryerDelayRemMins)
+            break
+        
+        case LAUNDRY_WASHER_WATER_LEVEL:
+            parseWaterLevel(item.value)
+            break
+        
+        case COMBO_DRYER_TEMPERATURE:
+            parseDryerTemperature(item.value)
+            break
+        
+        case COMBO_CYCLE_END_TIME:
+            parseCycleEndTime(item.value)
+            break
     }
 }
 
@@ -103,6 +145,43 @@ def parseSmartDispenseTankStatus(value)
 {
     def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)    
     sendEvent(name: "smartDispenseTankStatus", value: smartDispenseTankStatuses[decodeErdInt(subBytes(bytes, 0, 1))] ?: "unknown")
+}
+
+def parseSubCycle(value)
+{
+    def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)
+    def subCycleValue = decodeErdInt(subBytes(bytes, 0, 1))
+    sendEvent(name: "subCycle", value: subCycleStates[subCycleValue] ?: "unknown (0x${Integer.toHexString(subCycleValue)})")
+}
+
+def parseRemoteStatus(value)
+{
+    def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)
+    def remoteEnabled = decodeErdBool(bytes?.getAt(0))
+    sendEvent(name: "remoteStatus", value: remoteEnabled ? "enabled" : "disabled")
+}
+
+def parseWaterLevel(value)
+{
+    def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)
+    def waterLevelValue = decodeErdInt(subBytes(bytes, 0, 1))
+    sendEvent(name: "waterLevel", value: waterLevelValue)
+}
+
+def parseDryerTemperature(value)
+{
+    def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)
+    def tempValue = decodeErdInt(subBytes(bytes, 0, 1))
+    sendEvent(name: "dryerTemperature", value: dryerTemperatureSettings[tempValue] ?: "unknown (${tempValue})")
+}
+
+def parseCycleEndTime(value)
+{
+    // Cycle end time is in seconds
+    def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)
+    def endTimeSecs = decodeErdInt(bytes)
+    def endTimeMins = (endTimeSecs / 60).toInteger()
+    sendEvent(name: "cycleEndTime", value: endTimeMins)
 }
 
 import groovy.transform.Field
@@ -186,4 +265,49 @@ import groovy.transform.Field
 @Field LAUNDRY_DRYER_WASHERLINK_CONTROL = "0x206e"
 @Field LAUNDRY_DRYER_UNKNOWN206F = "0x206f"
 @Field LAUNDRY_WASHER_UNKNOWN2070 = "0x2070"
-@Field LAUNDRY_WASHER_UNKNOWN2072 = "0x2072"
+@Field LAUNDRY_WASHER_WATER_LEVEL = "0x2072"
+
+// Combination Washer Dryer ERD codes
+@Field COMBO_DRYER_DELAY_TIME_REMAINING = "0x2122"
+@Field COMBO_DRYER_TIME_REMAINING = "0x2123"
+@Field COMBO_DRYER_VENT_STATUS = "0x2127"
+@Field COMBO_DRYER_HEAT_SOURCE = "0x2139"
+@Field COMBO_DRYER_TEMPERATURE = "0x2140"
+@Field COMBO_DRYER_TEMPERATURE_RAW = "0x2141"
+@Field COMBO_DRYER_SETTINGS = "0x2144"
+@Field COMBO_CYCLE_END_TIME = "0x2145"
+@Field COMBO_DRYER_LEVEL = "0x2148"
+@Field COMBO_WASHER_SETTINGS_1 = "0x20bb"
+@Field COMBO_WASHER_SETTINGS_2 = "0x20be"
+@Field COMBO_WASHER_SETTINGS_3 = "0x20c2"
+
+@Field Map subCycleStates = 
+    [
+        0x00: "not_applicable",
+        0x01: "fill",
+        0x02: "soak",
+        0x03: "wash",
+        0x04: "rinse",
+        0x05: "spin",
+        0x06: "drain",
+        0x07: "extra_spin",
+        0x08: "extra_rinse",
+        0x09: "tumble",
+        0x0A: "load_size_detection",
+        0x0B: "drying",
+        0x0C: "mist_steam",
+        0x0D: "cool_down",
+        0x80: "drying",
+        0x82: "steam",
+        0x8D: "cool_down"
+    ]
+
+@Field Map dryerTemperatureSettings =
+    [
+        0x00: "off",
+        0x01: "ultra_low",
+        0x02: "low",
+        0x03: "medium",
+        0x04: "high",
+        0x05: "extra_high"
+    ]

@@ -172,6 +172,7 @@ def manageChildDevice(id, details = null)
             // alias types to more generic virtual device types
             case "Clothes Washer":
             case "Clothes Dryer":
+            case "Combination Washer Dryer":
                 details.type = "Laundry"
                 break
             case "Air Conditioner":
