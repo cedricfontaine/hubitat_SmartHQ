@@ -18,9 +18,9 @@ limitations under the License.
 
 Change history:
 
-0.9.7 - cfontaine - Added water level, dryer temperature, cycle end time for combo units
-0.9.6 - cfontaine - Added Combination Washer Dryer support (dryer time, sub cycle, remote status)
-0.9.5 - tomw - Improved Washer/Dryer support (in SmartHQ Laundry driver)
+0.9.17 - cfontaine - Added water level, dryer temperature, cycle end time for combo units
+0.9.16 - cfontaine - Added Combination Washer Dryer support (dryer time, sub cycle, remote status)
+0.9.5  - tomw - Improved Washer/Dryer support (in SmartHQ Laundry driver)
 0.9.2 - tomw - Make child logging follow system device setting
 0.9.0 - tomw - Initial release
 
